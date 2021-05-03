@@ -1,0 +1,337 @@
+#include<iostream>
+#include <windows.h>
+#include <conio.h>
+#include <cstdlib>
+#include <ctime>
+#include<vector>
+#include <random>
+using namespace std;
+COORD pos;
+HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
+class iView
+{
+public:
+    char livingCell;
+    char dyingCell;
+    int n;
+    char* drawField;
+    iView()
+    {
+        this->livingCell = '#';
+        this->dyingCell = '.';
+        this->n = 1;
+        this->drawField = new char [n];
+    }
+    iView(int n, char type)
+    {
+        this->livingCell = '#';
+        this->dyingCell = '.';
+        this->n = n;
+        this->drawField = new char[n];
+    }
+    friend ostream& operator<<(ostream& out, const iView& view)
+    {
+        for (int i = 0; i < view.n; i++)
+            out << view.drawField[i];
+        return out;
+    }
+};
+class View2d : public iView
+{
+public:
+    int m;
+    char** drawField_2d;
+    View2d()
+    {
+        this->m = 1;
+        this->drawField_2d = new char* [m];
+        for (int i = 0; i < m; i++)
+        {
+            drawField_2d[i] = drawField;
+        }
+    }
+    void setField2d(char** field, int n, int m)
+    {
+        this->n = n;
+        this->m = m;
+        drawField_2d = new char* [n];
+        for (int i = 0; i < n; i++) 
+        {
+            drawField_2d[i] = new char[m];
+            for (int j = 0; j < m; j++)
+                drawField_2d[i][j] = field[i][j];
+        }
+
+    };
+   void draw()
+    {
+        for (int i = 0; i < n; i++)
+        {
+            fwrite(drawField_2d[i], sizeof(char), m, stdout);
+            cout << '\n';
+        }
+    }
+};
+class View3d : public View2d
+{
+public:
+    int l;
+    char*** drawField_3d;
+    View3d()
+    {
+        this->l = 1;
+        this->drawField_3d = new char** [l];
+        for (int i = 0; i < l; i++)
+        {
+            drawField_3d[i] = drawField_2d;
+        }
+    }
+    void setField3d(char*** field, int n, int m, int l)
+    {
+        this->l = l;
+        this->n = n;
+        this->m = m;
+        drawField_3d = new char** [l];
+        for (int i = 0; i < n; i++) 
+        {
+            drawField_3d[i] = new char* [n];
+            for (int j = 0; j < m; j++)
+            {
+                drawField_3d[i][j] = new char[m];
+                for (int k = 0; k < l; k++)
+                    drawField_3d[i][j][k] = field[i][j][k];
+            }
+        }
+
+    };
+    void draw()
+    {
+        for (int i = 0; i < n; i++)
+        {
+            for (int j = 0; j < m; j++)
+            {
+                fwrite(drawField_3d[i][j], sizeof(char), l, stdout);
+                cout<<"\n";
+            }
+            cout << endl;
+        }
+    }
+};
+//Правила 2d и 3d игр
+enum Rools2d
+{
+    rool12, // если у мёртвой клетки ровно 3 соседа, то она оживает
+    rool22, // если у живой клетки > 3 соседей, она умирает
+    rool32 // если у живой клетки < 2 соседей, она умирает
+};
+enum Rools3d
+{
+    rool13, // если у мёртвой клетки ровно 8 соседей, то она оживает
+    rool23, // если у живой клетки > 8 соседей, она умирает
+    rool33 // если у живой клетки < 5 соседей, она умирает
+};
+class iGame
+{
+public:
+    virtual void runGame(int numIt) = 0;
+    double probability;
+    int seed;
+    iGame()
+    {
+        seed = 0;
+        probability = 0;
+    }
+};
+
+class Game2d : public iGame
+{
+public:
+    int n;
+    int m;
+    View2d view;
+    char** field;
+    char** field_next;
+    int getCount(int x, int y)
+    {
+        int count = 0;
+        for (int i = -1; i <= 1; i++)
+        {
+            for (int j = -1; j <= 1; j++)
+                if (field[(x + i + n) % n][(y + j+m) % m] == view.livingCell)
+                    count++;
+        }
+        return count;
+    }
+   
+    Game2d(int n_1, int m_1, double probability)
+    {
+        int tmp;
+        n = n_1;
+        m = m_1;
+        srand(time(NULL));
+        this->field = new char* [n];
+        this->field_next = new char* [n];
+        for (int i = 0; i < n; i++)
+        {
+            field[i] = new char[m];
+            field_next[i] = new char[m];
+            for (int j = 0; j < m; j++)
+            {
+                tmp = rand() % (100);
+                if (tmp < 100 * probability)
+                    field[i][j] = view.livingCell;
+                else
+                    field[i][j] = view.dyingCell;
+                field_next[i][j] = view.dyingCell;
+            }
+        }
+    }
+    void runGame(int numIt) 
+    {
+        cout << "Game on";
+        cout << "\n";
+        view.setField2d(field, n, m);
+        view.draw();
+        for(int tmp=0; tmp < numIt; tmp++)
+        {
+            for (int i = 0; i < n; i++)
+            {
+                for (int j = 0; j < m; j++)
+                {
+                    int count = getCount(i, j);
+                    if (field[i][j] == view.livingCell)
+                        count--;
+                    if (field[i][j] == view.livingCell && (count < 2 || count > 3))
+                        field_next[i][j] = view.dyingCell;
+                    else if (field[i][j] == view.dyingCell && count == 3)
+                        field_next[i][j] = view.livingCell;
+                    else
+                        field_next[i][j] = field[i][j];
+                }
+            }
+            for (int i = 0; i < n; i++)
+            {
+                for (int j = 0; j < m; j++)
+                {
+                    field[i][j] = field_next[i][j];
+
+                }
+            }
+        }
+        cout << "Results";
+        cout << "\n";
+        view.setField2d(field, n, m);
+        view.draw();
+        cout << "Game ower";
+        cout << "\n";
+    }
+};
+class Game3d :public iGame
+{
+public:
+    int n;
+    int m;
+    int l;
+    View3d view;
+    char*** field;
+    char*** field_next;
+    int getCount(int x, int y, int z)
+    {
+        int count = 0;
+        for (int i = -1; i <= 1; i++)
+        {
+            for (int j = -1; j <= 1; j++)
+            {
+                for (int k = -1; k <= 1; k++)
+                    if (field[(x + i + n) % n][(y + j + m) % m][(z + k + l) % l] == view.livingCell)
+                        count++;
+            }
+        }
+        return count;
+    }
+    Game3d(int n_1, int m_1, int l_1, double probability)
+    {
+        srand(time(NULL));
+        n = n_1;
+        m = m_1;
+        l = l_1;
+        field = new char** [n];
+        field_next = new char** [n];
+        for (int i = 0; i < n; i++)
+        {
+            field[i] = new char* [m];
+            field_next[i] = new char* [m];
+            for (int j = 0; j < m; j++)
+            {
+                field[i][j] = new char[l];
+                field_next[i][j] = new char[l];
+                for (int k = 0; k < l; k++)
+                {
+                       int tmp = rand() % (100);
+                        if (tmp < 100 * probability)
+                            field[i][j][k] = view.livingCell;
+                        else
+                            field[i][j][k] = view.dyingCell;
+                        field_next[i][j][k] = view.dyingCell;
+                }
+            }
+        }
+    }
+    void runGame(int numIt) 
+    {
+        cout << "Game on";
+        cout << "\n";
+        view.setField3d(field, n, m, l);
+        view.draw();
+        for(int tmp=0; tmp < numIt; tmp++)
+        {
+            for (int i = 0; i < n; i++)
+            {
+                for (int j = 0; j < m; j++)
+                {
+                    for (int k = 0; k < l; k++)
+                    {
+                        int count = getCount(i, j, k);
+                        if (field[i][j][k] == view.livingCell)
+                            count--;
+                        if (field[i][j][k] == view.livingCell && (getCount(i, j, k) < 5 || getCount(i, j, k) > 8))
+                            field_next[i][j][k] = view.dyingCell;
+                        else if (field[i][j][k] == view.dyingCell && getCount(i, j, k) == 8)
+                            field_next[i][j][k] = view.livingCell;
+                    }
+                }
+            }
+            for (int i = 0; i < n; i++)
+            {
+                for (int j = 0; j < m; j++)
+                {
+                    for (int k = 0; k < l; k++)
+                    {
+                        field[i][j][k] = field_next[i][j][k];
+
+                    }
+                }
+            }
+        }
+        cout << "Results";
+        cout << "\n";
+        view.setField3d(field, n, m, l);
+        view.draw();
+        cout << "Game ower";
+        cout << "\n";
+    }
+};
+int main()
+{
+    iGame* a2;
+    Game2d* b2 = new Game2d(5, 5, 0.45);
+    a2 = b2;
+    iGame* a3;
+    Game3d* b3 = new Game3d(3, 5, 5, 0.3);
+    a3 = b3;
+    a2->runGame(1);
+    a3->runGame(1);
+
+}
+
+
