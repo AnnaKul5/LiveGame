@@ -360,15 +360,21 @@ public:
         for (int i = 0; i < l; i++)
         {
             for (int j = 0; j < m; j++)
-                delete[]field[i][j];
+            {
+                delete[] field[i][j];
+            }
+                delete[] field[i];
         }
-        delete[]field;
+        delete[] field;
         for (int i = 0; i < l; i++)
         {
             for (int j = 0; j < m; j++)
-                delete[]field_next[i][j];
+            {
+                delete[] field_next[i][j];
+            }
+                delete[] field_next[i];
         }
-        delete[]field_next;
+        delete[] field_next;
         l = 0;
         m = 0;
         n = 0;
